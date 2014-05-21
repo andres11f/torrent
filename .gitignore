@@ -2,6 +2,8 @@ README~
 .gitignore~
 *.torrent~
 *.torrent
+*.txt~
+*.txt
 torrent
 torrent.o
 tracker

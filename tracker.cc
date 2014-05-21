@@ -1,9 +1,12 @@
+#include <iostream>
 #include <unordered_map>
+#include <czmq.h>
+#include <list>
 
 using namespace std;
 
 int main () {
-  unordered_map<string, list<string>> files;  //name of file, address of peers
+  unordered_map<string, string> files;  //structure that can hold name of file, adresses of peers with that file, and parts that each peer has
   
 
   zctx_t *context = zctx_new();
@@ -16,7 +19,7 @@ int main () {
     msg = zmsg_recv(responder);
     zmsg_dump(msg);
     zmsg_t *response = zmsg_new();
-    dispatch(msg, response);
+    //dispatch(msg, response);
     zmsg_destroy(&msg);
     zmsg_send(&response, responder);
     zmsg_destroy(&response);
@@ -30,7 +33,10 @@ int main () {
 void dispatch(zmsg_t *msg, zmsg_t *response){
   assert(zmsg_size(msg) >= 1); //zmsg_size da el tamaño en numero de frames
   char *op = zmsg_popstr(msg);
-  if (strcmp(op, "search") == 0){
+  if (strcmp(op, "newtorrent") == 0){
+
+  } /*
+  if (strcmp(op, "newtorrent") == 0){
     char *q = zmsg_popstr(msg);
     string query = q;
     if (files.count(query))
@@ -41,5 +47,5 @@ void dispatch(zmsg_t *msg, zmsg_t *response){
         zmsg_addstr(response, it->c_str());
     else
       zmsg_addstr(response,"failure");
-  }
+  }*/
 }
