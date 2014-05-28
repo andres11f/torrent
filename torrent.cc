@@ -2,12 +2,14 @@
 #include <fstream>
 #include <string>
 #include <czmq.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 using namespace std;
 
 
 void createTorrent (string fileName, string trackerAdr, string peerAdr, zctx_t *context);
-string defineParts(istream& baseFile);
+string defineParts(istream& baseFile, string fileName);
 
 
 int main () {
@@ -57,7 +59,7 @@ void createTorrent (string fileName, string trackerAdr, string peerAdr, zctx_t *
 
   //define number of parts
   ifstream baseFile(tmp += ".txt");
-  parts = defineParts(baseFile);
+  parts = defineParts(baseFile, fileName);
   cout << "parts of file "<< fileName << ": " << parts << "\n";
   tmp = fileName;
 
@@ -79,6 +81,7 @@ void createTorrent (string fileName, string trackerAdr, string peerAdr, zctx_t *
   ifstream torrentFileI (tmp += ".torrent");
   void *tracker = zsocket_new(context, ZMQ_REQ);
   getline (torrentFileI,line);
+  cout << line << "\n";
   int rc = zsocket_connect (tracker, trackerAdr.c_str());
   assert(rc == 0);
 
@@ -103,15 +106,33 @@ void createTorrent (string fileName, string trackerAdr, string peerAdr, zctx_t *
 }
 
 
-string defineParts(istream& baseFile){
-  string parts, line;
-  int cont=0, tmp;
-  while(getline(baseFile, line))
+string defineParts(istream& baseFile, string fileName){
+  string parts, line, folder = fileName, npart, tmp;
+  int cont = 0, contParts = 0;
+  npart = to_string(contParts);
+  if (mkdir(folder.c_str(),0777) == -1){
+    cerr<<"Error :  "<<strerror(errno)<<endl;
+    exit(1);
+  }
+  tmp = folder+="/";
+  ofstream part(tmp+=npart);
+  cout <<  tmp << "\n";
+  while(getline(baseFile, line)){
     cont++;
-  cout << "Number of lines: " << cont << "\n";
-  tmp = cont/256;
-  if (cont%256>0)
-    tmp=tmp+1;
-  parts = to_string(tmp);
+    part << line;
+    if (cont == 256){
+      contParts++;
+      cont = 0;
+      tmp.clear();
+      npart.clear();
+      tmp = folder;
+      npart = to_string(contParts);
+      part.close();
+      part.open(tmp+=npart);
+      cout <<  tmp << "\n";
+    }
+  }
+  part.close();
+  parts = to_string(contParts);
   return parts;
 }
