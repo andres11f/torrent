@@ -1,24 +1,32 @@
 #include <iostream>
 #include <unordered_map>
 #include <czmq.h>
-#include <list>
 #include <vector>
 
 using namespace std;
 
-class Peer {
+
+class File {
 private:
-  string address;
-  vector<int> parts;  //0 not, 1 yes
+  string name;
+  unordered_map<string, vector<int>> peers; //ip, vector 0 dont, 1 have it
 public:
-  Peer(string a, vector<int> ps){address = a; parts = ps;}
-  string getAddress(){return address;}
-  string printParts(){
+  File() {}
+  File(string n, unordered_map<string, vector<int>> ps) {name = n; peers = ps;}
+  void printFile(){
+    cout << "------FILE-----\n";
+    cout << "Name: " << name << "\n";
+    for (unordered_map<string, vector<int>>::iterator it = peers.begin(); it != peers.end(); ++it)
+      cout << "Peer: " << it->first << " parts: " << printParts(it->first) << "\n";
+  }
+  string printParts(string peer){
     int i=0;
     string line = "";
+    vector<int> parts = peers[peer];
     while(i<parts.size()){
       if (parts[i]==1){
         string s = to_string(i);
+        s += " ";
         line += s;
       }
       i++;
@@ -27,22 +35,9 @@ public:
   }
 };
 
-class File {
-private:
-  string name;
-  list<Peer> peers;
-public:
-  File() {}
-  File(string n, list<Peer> ps) {name = n; peers = ps;}
-  void printFile(){
-    cout << "------FILE-----\n";
-    cout << "Name: " << name << "\n";
-    for (list<Peer>::iterator it = peers.begin(); it != peers.end(); ++it)
-      cout << "Peer: " << it->getAddress() << " parts: " << it->printParts() << "\n";
-  }
-};
 
 unordered_map<string, File> files;
+
 
 void dispatch(zmsg_t *msg, zmsg_t *response);
 bool createFile(char* fileName, char* nParts, char* peerAdr);
@@ -90,7 +85,7 @@ void dispatch(zmsg_t *msg, zmsg_t *response){
       zmsg_addstr(response, "success");
     else
       zmsg_addstr(response, "failure");
-    files.begin()->second.printFile();
+    printFiles();
     free(fileName);
     free(nParts);
     free(peerAdr);
@@ -102,9 +97,9 @@ bool createFile(char* fileName, char* nParts, char* peerAdr){
   string pa = peerAdr, fName = fileName;
   int np = atoi(nParts);
   vector<int> parts(np,1);
-  Peer p = Peer(pa, parts);
-  list<Peer> peers (1, p);
-  files[fName]=File(fName, peers);
+  unordered_map<string,vector<int>> umFile;
+  umFile[fName]=parts;
+  files[fName]=File(fName, umFile);
   return true;
 }
 
