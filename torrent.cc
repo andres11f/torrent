@@ -238,13 +238,30 @@ int download(string torrentName, int maxDownloads, zctx_t *context){
     cout << (*it) << "\n";
   free(result);
   free(p);
-
-
   /*
-  conect to peer
-  download part
-  check if complete
+  zmsg_destroy(&msg);
+  zsocket_destroy(context, tracker);
   */
+
+  //connection to peer
+  void *peerSocket = zsocket_new(context, ZMQ_REQ);
+  string chosenPeer = choosePeers(peers);
+  cout << "Chosen peer: " << chosenPeer;
+  int rc = zsocket_connect(peerSocket, chosenPeer.c_str());
+  assert (rc == 0);
+
+  zmsg_t *peermsg = zmsg_new();
+  op = "part";
+  zmsg_addstr(peermsg, op.c_str());
+  zmsg_addstr(peermsg, fileName.c_str());
+  zmsg_addstr(peermsg, part.c_str());
+  zmsg_send(&peermsg, peerSocket);
+  assert (peermsg == NULL);
+  peermsg = zmsg_recv(peerSocket);
+  result = zmsg_popstr(peermsg);
+  char *filePart = zmsg_popstr(peermsg);
+  //save part to folder
+  //check if complete
 
 /*
 
@@ -298,4 +315,14 @@ list<string> obtainPeers(char *p){
       peers.push_back(tmp);
   }
   return peers;
+}
+
+string choosePeers(list<string> peers){
+  srand(time(NULL));
+  int n = rand() % peers.size();
+  int i = 0;
+  list<string>::iterator it = peers.begin();
+  while (int i < n)
+    ++it;
+  return (*it);
 }
