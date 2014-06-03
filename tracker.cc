@@ -45,6 +45,20 @@ public:
     }
     return peersList;
   }
+
+  void addPeerPart(string peer, int part){
+    vector<int> v(1,0);
+    if (peers.count(peer) > 0)
+      v = peers[peer];
+    else{
+      int nParts = peers.begin()->second.size();
+      vector<int> tmp(nParts, 0);
+      v = tmp;
+      peers[peer] = v;
+    }
+    if (v[part] == 0)
+      v[part] = 1;
+  }
 };
 
 
@@ -100,7 +114,7 @@ void dispatch(zmsg_t *msg, zmsg_t *response){
 
     //print files
     for (unordered_map<string,File>::iterator it = files.begin(); it != files.end(); ++it)
-    it->second.printFile();
+      it->second.printFile();
 
     free(fileName);
     free(nParts);
@@ -127,16 +141,21 @@ void dispatch(zmsg_t *msg, zmsg_t *response){
   if (strcmp(op, "askpart") == 0){
     //message asking for who has x part
     char *fn = zmsg_popstr(msg);
+    char *pa = zmsg_popstr(msg);
     char *p = zmsg_popstr(msg);
 
     string fileName = fn;
-    string peersList = files[fn].peersWithPart(atoi(p));
+    string peerAdr = pa;
+    string peersList = files[fileName].peersWithPart(atoi(p));
     cout << "Raw peers list of file " << fileName << " with part " << atoi(p) << ": " << peersList << "\n";
     if (peersList == "")
       zmsg_addstr(response, "failure");
     else
       zmsg_addstr(response, "success");
     zmsg_addstr(response, peersList.c_str());
+    files[fileName].addPeerPart(peerAdr, atoi(p));    //NO ESTA AGREGANDO LAS PARTES AL OBJETO
+    for (unordered_map<string,File>::iterator it = files.begin(); it != files.end(); ++it)
+      it->second.printFile();
     free(fn);
     free(p);
   }
