@@ -1,3 +1,7 @@
+#include <stdio.h>
+#include <unistd.h>
+#include <assert.h>
+#include <stdlib.h>
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -17,6 +21,7 @@ private:
   string name;
   vector<int> parts; //partes   0 dont, 1 have it
 public:
+  File(){}
   File(string n, vector<int> ps){name = n; parts = ps;}
   File(string n, int nParts){name = n; vector<int> ps(nParts,0); parts = ps;}
 
@@ -28,21 +33,55 @@ public:
         return to_string(n);
     }
   }
+  void partDownloaded(string p){
+    int pos = atoi(p.c_str());
+    if (parts[pos] == 0)
+      parts[pos] = 1;
+    else
+      return;
+  }
 
-  void printFile(){}
+  void printFile(){
+    cout << "------FILE-----\n";
+    cout << "Name: " << name << "\n";
+    cout << "Parts: ";
+    for (int i = 0; i<parts.size(); i++)
+      if (parts[i] == 1)
+        cout << i << " ";
+  }
 
-  bool checkComplete(){}
+  bool checkComplete(){
+    for (int i=0; i != parts.size(); i++){
+      if (parts[i] == 0)
+        return false;
+    }
+    return true;
+  }
+
+  string getPart(int p){
+    string file = name, line, filePart = "";
+    file += "/";
+    file += to_string(p);
+    ifstream filestream (file);
+    if (filestream.is_open()){
+      while ( getline (filestream,line)){
+        filePart+=line;
+      }
+    filestream.close();
+    }
+    return filePart;
+  }
 
 };
 
+unordered_map<string, File> files;
+
 void createTorrent (string fileName, string trackerAdr, string peerAdr, zctx_t *context);
 string defineParts(istream& baseFile, string fileName);
-
 int download (string torrentName, int maxDownloads, zctx_t *context);
 list<string> obtainPeers(char *p);
+string choosePeers(list<string> peers);
 
-
-unordered_map<string, File> files;
 
 
 int main () {
@@ -52,41 +91,83 @@ int main () {
   int maxDownloads = 42;
   cout << "port to use for listening:";
   cin >> adr;
+  string adrtmp = "tcp://*:";
+  adrtmp.append(adr);
+
+  void *listener = zsocket_new(context, ZMQ_REP);
+  int rc = zsocket_bind (listener, adrtmp.c_str());
+  cout << rc << "\n";
+
   /*cout << "Max Downloads: ";
   cin >> maxDownloads;*/
   string peerAdr = "tcp://localhost:";
   peerAdr.append(adr);
 
+
+
+  zmq_pollitem_t items [] = {
+    {NULL, STDIN_FILENO, ZMQ_POLLIN, 0},
+    {listener, 0, ZMQ_POLLIN, 0}
+  };
+
+  
+  
   while(1){
     string input = "";
-    cout << "1. Download  \n";
+    cout << "\n1. Download  \n";
     cout << "2. Create torrent \n";
     cout << "0. Exit \n";
     cout << "Selection: ";
     cout.flush();
-    cin >> input;
 
-    if (input == "1"){
-      string torrentName;
-      int maxDownloads;
-      cout << "Torrent Name: ";
-      cin >> torrentName;
-      download(torrentName, maxDownloads, context);
+    zmq_poll(items, 2, -1);
+
+    if (items[0].revents & ZMQ_POLLIN){
+      cin >> input;
+      if (input == "1"){
+        string torrentName;
+        int maxDownloads;
+        cout << "Torrent Name: ";
+        cin >> torrentName;
+        download(torrentName, maxDownloads, context);
+      }
+
+      else if (input == "2"){
+        string fileName, tracker;
+        cout << "File:";
+        cin >> fileName;
+        cout << "Tracker:";
+        cin >> tracker;
+        createTorrent(fileName, tracker, peerAdr, context);
+      }
+
+      else if (input == "0"){
+        return 0;
+      }
     }
 
-    else if (input == "2"){
-      string fileName, tracker;
-      cout << "File:";
-      cin >> fileName;
-      cout << "Tracker:";
-      cin >> tracker;
-      createTorrent(fileName, tracker, peerAdr, context);
-    }
-
-    else if (input == "0"){
-      return 0;
+    if (items[1].revents & ZMQ_POLLIN){
+      zmsg_t *msgrecv = zmsg_recv(listener);
+      char *op = zmsg_popstr(msgrecv);
+      if (strcmp(op, "part") == 0){
+        char *fn = zmsg_popstr(msgrecv);
+        char *p = zmsg_popstr(msgrecv);
+        string fileName = fn;
+        int part = atoi(p);
+        string filePart = files[fileName].getPart(part);
+        cout << "Part to send: " << part << "\n";
+        zmsg_t *msgout = zmsg_new();
+        zmsg_addstr(msgout, "success");
+        zmsg_addstr(msgout, filePart.c_str());
+        zmsg_send(&msgout, listener);
+        zmsg_destroy(&msgrecv);
+        zmsg_destroy(&msgout);
+        free(fn);
+        free(p); 
+      }
     }
   }
+  
 
   zctx_destroy(&context);
   return 0;
@@ -139,6 +220,13 @@ void createTorrent (string fileName, string trackerAdr, string peerAdr, zctx_t *
 
   char *result = zmsg_popstr(msg);
   cout << result << "\n";
+  if (strcmp(result, "success") == 0){
+    vector<int> ps(atoi(parts.c_str()),1);
+    File f = File(fileName, ps);
+    f.printFile();
+    files[fileName]=f;
+  }
+
 
   torrentFileI.close();
   free(result);
@@ -209,14 +297,14 @@ int download(string torrentName, int maxDownloads, zctx_t *context){
     return -1;
   int nParts = atoi(np);
   cout << "Number of parts of file " << fileName << ": " << nParts << "\n";
-  File f = File(fileName, nParts);
+  File file = File(fileName, nParts);
   free(result);
   free(np);
 
 
   //without concurrence asking who has x part
   zmsg_t *msg = zmsg_new();
-  string part = f.choosePart();    //part to ask to tracker
+  string part = file.choosePart();    //part to ask to tracker
 
   op = "askpart";
   zmsg_addstr(msg, op.c_str());
@@ -246,8 +334,8 @@ int download(string torrentName, int maxDownloads, zctx_t *context){
   //connection to peer
   void *peerSocket = zsocket_new(context, ZMQ_REQ);
   string chosenPeer = choosePeers(peers);
-  cout << "Chosen peer: " << chosenPeer;
-  int rc = zsocket_connect(peerSocket, chosenPeer.c_str());
+  cout << "Chosen peer: " << chosenPeer << "\n";
+  rc = zsocket_connect(peerSocket, chosenPeer.c_str());
   assert (rc == 0);
 
   zmsg_t *peermsg = zmsg_new();
@@ -258,49 +346,32 @@ int download(string torrentName, int maxDownloads, zctx_t *context){
   zmsg_send(&peermsg, peerSocket);
   assert (peermsg == NULL);
   peermsg = zmsg_recv(peerSocket);
+
   result = zmsg_popstr(peermsg);
-  char *filePart = zmsg_popstr(peermsg);
-  //save part to folder
-  //check if complete
+  char *fp = zmsg_popstr(peermsg);
+  string filePart = fp;
+  string folder = fileName;
 
-/*
-
-
-
-
-
-
-  //obtain parts
-  char *result = zmsg_popstr(msg);
-  if (strcmp(result, "failure") == 0)
-    return -1;
-  char *np = zmsg_popstr(msg);
-  int nPeers = atoi(np);
-  for (int i = 0; i < nPeers*2; i++){
-    char *p = zmsg_popstr(msg);  //peer address
-    char *ps = zmsg_popstr(msg);  //partes
-    string peer = p;
-
-    //create vector and unordered map
-    vector<int> parts = createVector(ps);
-    unordered_map<string, vector<int>> umparts;
-    umparts[p]=parts;
-    //create file
-    File f = File(fileName, um);
-    files.push_back(f);
+  //part to folder
+  folder+="_downloading";
+  if (mkdir(folder.c_str(),0777) == -1){
+    cerr<<"Error :  "<<strerror(errno)<<endl;
+    exit(1);
   }
-  f.choosePeers(maxDownloads);
-  //elegir peers de donde se descargara (debe ser menor al numero de descargas posibles)
-  //abrir hilos
-  //POR HILO
-  //elegir parte a descargar
-  //pedir parte
-  //guardar en carpeta temporal
-  //actualizo estado del archivo: vector downloadedParts
-  //checkComplete()
-*/
-  zmsg_destroy(&com);
+  string tmp = folder+="/";
+  ofstream partStream(tmp+=part);
+  partStream << filePart;
+  partStream.close();
+  file.partDownloaded(part);
+  file.printFile();
+  file.checkComplete();
+
+
+
+
+  zmsg_destroy(&peermsg);
   zmsg_destroy(&msg);
+  zsocket_destroy(context, peerSocket);
   zsocket_destroy(context, tracker);
 }
 
@@ -322,7 +393,9 @@ string choosePeers(list<string> peers){
   int n = rand() % peers.size();
   int i = 0;
   list<string>::iterator it = peers.begin();
-  while (int i < n)
+  while (i < n){
     ++it;
+    i++;
+  }
   return (*it);
 }
