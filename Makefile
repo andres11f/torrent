@@ -21,5 +21,5 @@ tracker.o: tracker.cc
 	$(CXX) -I$(ZMQ_INCLUDES) -c tracker.cc
 
 clean:
-	rm -f torrent torrent.o tracker tracker.o *.torrent ASOIAF/* ASOIAF_downloading/*
+	rm -f torrent torrent.o tracker tracker.o *.torrent ASOIAF/* ASOIAF_downloading/* ASOIAF_download.txt
 	rmdir ASOIAF ASOIAF_downloading

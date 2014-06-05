@@ -47,17 +47,20 @@ public:
   }
 
   void addPeerPart(string peer, int part){
-    vector<int> v(1,0);
-    if (peers.count(peer) > 0)
-      v = peers[peer];
-    else{
-      int nParts = peers.begin()->second.size();
-      vector<int> tmp(nParts, 0);
-      v = tmp;
-      peers[peer] = v;
+    int nParts = peers.begin()->second.size();
+    vector<int> tmp(nParts, 0);
+    cout << "nParts: " << nParts << "\n";
+    if (peers.count(peer) > 0){
+      tmp = peers[peer];
+      if (tmp[part] == 0)
+        tmp[part] = 1;
+      peers[peer] = tmp;
     }
-    if (v[part] == 0)
-      v[part] = 1;
+    else{
+      if (tmp[part] == 0)
+        tmp[part] = 1;
+      peers[peer] = tmp;
+    }
   }
 };
 
@@ -123,19 +126,14 @@ void dispatch(zmsg_t *msg, zmsg_t *response){
 
   if (strcmp(op, "download") == 0){
     //first message received asking for number of parts
-    char *fn = zmsg_popstr(msg);
-    string fileName = fn;
-    //search for file
-    if (files.find(fn) != files.end())
+    string fileName = zmsg_popstr(msg);
+    if (files.find(fileName) != files.end())
       zmsg_addstr(response, "success");
     else
       zmsg_addstr(response, "failure");
-
     string nParts = to_string(files[fileName].getNumberParts());
-    cout << "The number of parts of file " << fileName << "is: " << nParts;
     zmsg_addstr(response, nParts.c_str());
-
-    free(fn);
+    cout << "The number of parts of file " << fileName << "is: " << nParts;
   }
 
   if (strcmp(op, "askpart") == 0){
@@ -153,7 +151,10 @@ void dispatch(zmsg_t *msg, zmsg_t *response){
     else
       zmsg_addstr(response, "success");
     zmsg_addstr(response, peersList.c_str());
-    files[fileName].addPeerPart(peerAdr, atoi(p));    //NO ESTA AGREGANDO LAS PARTES AL OBJETO
+
+    //add information about peer now having the part
+    files[fileName].addPeerPart(peerAdr, atoi(p));
+    //print files
     for (unordered_map<string,File>::iterator it = files.begin(); it != files.end(); ++it)
       it->second.printFile();
     free(fn);
@@ -171,9 +172,4 @@ bool createFile(char* fileName, char* nParts, char* peerAdr){
   umFile[peerAdr]=parts;
   files[fName]=File(fName, umFile);
   return true;
-}
-
-
-void printFiles(){
-  
 }
