@@ -35,13 +35,14 @@ public:
     }
     return line;
   }
-  string peersWithPart(int p){
+  string peersWithParts(){
     string peersList = "";
     for (unordered_map<string, vector<int>>::iterator it = peers.begin(); it != peers.end(); ++it){
-      if (it->second[p] == 1){
-        peersList += it->first;
-        peersList += '+';
-      }
+      peersList += it->first;
+      peersList += '-';
+      for (int i = 0; i < it->second.size(); i++)
+        peersList += to_string(it->second[i]);
+      peersList += '+';
     }
     return peersList;
   }
@@ -133,32 +134,26 @@ void dispatch(zmsg_t *msg, zmsg_t *response){
       zmsg_addstr(response, "failure");
     string nParts = to_string(files[fileName].getNumberParts());
     zmsg_addstr(response, nParts.c_str());
-    cout << "The number of parts of file " << fileName << "is: " << nParts;
+    cout << "The number of parts of file " << fileName << "is: " << nParts << "\n";
   }
 
-  if (strcmp(op, "askpart") == 0){
+  if (strcmp(op, "askparts") == 0){
     //message asking for who has x part
-    char *fn = zmsg_popstr(msg);
-    char *pa = zmsg_popstr(msg);
-    char *p = zmsg_popstr(msg);
-
-    string fileName = fn;
-    string peerAdr = pa;
-    string peersList = files[fileName].peersWithPart(atoi(p));
-    cout << "Raw peers list of file " << fileName << " with part " << atoi(p) << ": " << peersList << "\n";
+    string fileName = zmsg_popstr(msg);
+    //generate list of peers with parts of file
+    string peersList = files[fileName].peersWithParts();
+    cout << "Raw peers list of file " << fileName << ": " << peersList << "\n";
     if (peersList == "")
       zmsg_addstr(response, "failure");
     else
       zmsg_addstr(response, "success");
     zmsg_addstr(response, peersList.c_str());
 
-    //add information about peer now having the part
-    files[fileName].addPeerPart(peerAdr, atoi(p));
+    //add information about peer now having the part CHECK THIS, IT HAS TO BE DONE LATER
+    //files[fileName].addPeerPart(peerAdr, atoi(p));
     //print files
     for (unordered_map<string,File>::iterator it = files.begin(); it != files.end(); ++it)
       it->second.printFile();
-    free(fn);
-    free(p);
   }
   free(op);
 }
