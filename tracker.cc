@@ -50,7 +50,6 @@ public:
   void addPeerPart(string peer, int part){
     int nParts = peers.begin()->second.size();
     vector<int> tmp(nParts, 0);
-    cout << "nParts: " << nParts << "\n";
     if (peers.count(peer) > 0){
       tmp = peers[peer];
       if (tmp[part] == 0)
@@ -140,6 +139,7 @@ void dispatch(zmsg_t *msg, zmsg_t *response){
   if (strcmp(op, "askparts") == 0){
     //message asking for who has x part
     string fileName = zmsg_popstr(msg);
+
     //generate list of peers with parts of file
     string peersList = files[fileName].peersWithParts();
     cout << "Raw peers list of file " << fileName << ": " << peersList << "\n";
@@ -148,12 +148,24 @@ void dispatch(zmsg_t *msg, zmsg_t *response){
     else
       zmsg_addstr(response, "success");
     zmsg_addstr(response, peersList.c_str());
+  }
 
     //add information about peer now having the part CHECK THIS, IT HAS TO BE DONE LATER
-    //files[fileName].addPeerPart(peerAdr, atoi(p));
+  if (strcmp(op, "haspart") == 0){
+    string fileName = zmsg_popstr(msg);
+    string peerAdr = zmsg_popstr(msg);
+    char *part = zmsg_popstr(msg);
+
+    cout << "PEERADR: " << peerAdr << " PART: " << part << "\n";
+
+    files[fileName].addPeerPart(peerAdr, atoi(part));
+
+    zmsg_addstr(response, "success");
+
     //print files
     for (unordered_map<string,File>::iterator it = files.begin(); it != files.end(); ++it)
       it->second.printFile();
+    free(part);
   }
   free(op);
 }
