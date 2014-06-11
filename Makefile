@@ -1,7 +1,7 @@
 #export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/andres/cs/zmq/lib
 #error while loading shared libraries: libzmq.so.3: cannot open shared object file: No such file or directory
 #CXX=g++-4.7 -std=c++11
-CXX=g++ -std=c++11
+CXX=g++ -std=c++11 -pthread
 ZMQ=/home/andres/cs/zmq
 ZMQ_INCLUDES=$(ZMQ)/include
 ZMQ_LIBS=$(ZMQ)/lib
