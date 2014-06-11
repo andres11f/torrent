@@ -136,7 +136,7 @@ void dispatch(zmsg_t *msg, zmsg_t *response){
       zmsg_addstr(response, "failure");
     string nParts = to_string(files[fileName].getNumberParts());
     zmsg_addstr(response, nParts.c_str());
-    cout << "The number of parts of file " << fileName << "is: " << nParts << "\n";
+    cout << "The number of parts of file " << fileName << " is: " << nParts << "\n";
   }
 
   if (strcmp(op, "askparts") == 0){

@@ -170,7 +170,7 @@ int main () {
         return 0;
       }
     }
-
+    
     if (items[1].revents & ZMQ_POLLIN){
       zmsg_t *msgrecv = zmsg_recv(listener);
       char *op = zmsg_popstr(msgrecv);
