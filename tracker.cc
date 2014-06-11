@@ -15,6 +15,7 @@ public:
   File() {}
   File(string n, unordered_map<string, vector<int>> ps) {name = n; peers = ps;}
   int getNumberParts(){return peers.begin()->second.size();}
+
   void printFile(){
     cout << "------FILE-----\n";
     cout << "Name: " << name << "\n";
@@ -22,7 +23,7 @@ public:
       cout << "Peer: " << it->first << " parts: " << printParts(it->first) << "\n";
   }
   string printParts(string peer){
-    int i=0;
+    unsigned int i=0;
     string line = "";
     vector<int> parts = peers[peer];
     while(i<parts.size()){
@@ -35,14 +36,16 @@ public:
     }
     return line;
   }
-  string peersWithParts(){
+  string peersWithParts(string ownPeer){
     string peersList = "";
     for (unordered_map<string, vector<int>>::iterator it = peers.begin(); it != peers.end(); ++it){
-      peersList += it->first;
-      peersList += '-';
-      for (int i = 0; i < it->second.size(); i++)
-        peersList += to_string(it->second[i]);
-      peersList += '+';
+      if (it->first != ownPeer){
+        peersList += it->first;
+        peersList += '-';
+        for (unsigned int i = 0; i < it->second.size(); i++)
+          peersList += to_string(it->second[i]);
+        peersList += '+';
+      }
     }
     return peersList;
   }
@@ -70,7 +73,6 @@ unordered_map<string, File> files;
 
 void dispatch(zmsg_t *msg, zmsg_t *response);
 bool createFile(char* fileName, char* nParts, char* peerAdr);
-void printFiles();
 
 
 int main () {
@@ -106,6 +108,7 @@ int main () {
 void dispatch(zmsg_t *msg, zmsg_t *response){
   assert(zmsg_size(msg) >= 1); //zmsg_size da el tamaño en numero de frames
   char *op = zmsg_popstr(msg);
+
   if (strcmp(op, "newtorrent") == 0){
     char *fileName = zmsg_popstr(msg);
     char *nParts = zmsg_popstr(msg);
@@ -139,9 +142,10 @@ void dispatch(zmsg_t *msg, zmsg_t *response){
   if (strcmp(op, "askparts") == 0){
     //message asking for who has x part
     string fileName = zmsg_popstr(msg);
+    string peerAdr = zmsg_popstr(msg);
 
     //generate list of peers with parts of file
-    string peersList = files[fileName].peersWithParts();
+    string peersList = files[fileName].peersWithParts(peerAdr);
     cout << "Raw peers list of file " << fileName << ": " << peersList << "\n";
     if (peersList == "")
       zmsg_addstr(response, "failure");
@@ -150,13 +154,11 @@ void dispatch(zmsg_t *msg, zmsg_t *response){
     zmsg_addstr(response, peersList.c_str());
   }
 
-    //add information about peer now having the part CHECK THIS, IT HAS TO BE DONE LATER
+    //add information about peer now having the part
   if (strcmp(op, "haspart") == 0){
     string fileName = zmsg_popstr(msg);
     string peerAdr = zmsg_popstr(msg);
     char *part = zmsg_popstr(msg);
-
-    cout << "PEERADR: " << peerAdr << " PART: " << part << "\n";
 
     files[fileName].addPeerPart(peerAdr, atoi(part));
 

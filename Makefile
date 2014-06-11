@@ -10,16 +10,19 @@ all: torrent tracker
 
 torrent: torrent.o
 	$(CXX) -L$(ZMQ_LIBS) -o torrent torrent.o -lzmq -lczmq
+	mkdir torrent1 && cp torrent torrent1/
+	mkdir torrent2 && cp torrent torrent2/
+	mkdir torrent3 && cp torrent torrent3/
 
 torrent.o: torrent.cc
-	$(CXX) -I$(ZMQ_INCLUDES) -c torrent.cc
+	$(CXX) -W -Wall -Werror -I$(ZMQ_INCLUDES) -c torrent.cc
 
 tracker: tracker.o
 	$(CXX) -L$(ZMQ_LIBS) -o tracker tracker.o -lzmq -lczmq
 
 tracker.o: tracker.cc
-	$(CXX) -I$(ZMQ_INCLUDES) -c tracker.cc
+	$(CXX) -W -Wall -Werror -I$(ZMQ_INCLUDES) -c tracker.cc
 
 clean:
-	rm -f torrent torrent.o tracker tracker.o *.torrent ASOIAF/* ASOIAF_downloading/* ASOIAF_download.txt
-	rmdir ASOIAF ASOIAF_downloading
+	rm -f torrent torrent.o tracker tracker.o *.torrent ASOIAF_download.txt
+	rm -r torrent1 torrent2 torrent3
